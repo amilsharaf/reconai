@@ -12,11 +12,13 @@
     "explain": "tsx scripts/run-ai-explanations.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
     "@anthropic-ai/sdk": "^0.122.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "next": "^15.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
