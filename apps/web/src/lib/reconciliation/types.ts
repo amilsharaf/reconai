@@ -18,6 +18,13 @@ export interface OrderReconciliationInput {
   payments: Payment[];
   settlements: Settlement[];
   bankTransactions: BankTransaction[];
+  /**
+   * Every bank_transactions row in the whole dataset with
+   * matched_settlement_id IS NULL — not just this order's own rows. Used
+   * only by the fuzzy candidate-matching pass (fuzzyMatch.ts), and only
+   * when this order's settlement has no cleanly linked bank transaction.
+   */
+  orphanBankTransactions: BankTransaction[];
 }
 
 /**

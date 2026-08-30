@@ -10,8 +10,12 @@ PROJECT_SUMMARY.md §3, database/migrations/00003_rls_policies.sql).
 Reports, for dev and test splits separately:
   - Binary anomaly detection: precision / recall / F1, TP/FP/FN/TN counts.
   - Per-issue-type classification: precision / recall / F1 for each of the
-    six exception categories, treating NORMAL as a seventh class (i.e. a
+    six exception categories, treating NORMAL as a seventh class, plus an
+    eighth UNRESOLVED_UNLINKED class for the hard tier's unmatched-bank-
+    credit cases, which don't fit any of the six fixed categories (i.e. a
     full multiclass confusion breakdown, not just "did it flag *something*").
+    See the UNRESOLVED_UNLINKED note below load_data() for why this eighth
+    bucket exists and how it's derived without touching the DB schema.
   - Rupee-value impact: value reconciled vs. value at risk, split into
     correctly-caught risk (TP) vs. incorrectly-flagged value (FP) vs.
     missed risk (FN).
@@ -53,7 +57,17 @@ ISSUE_TYPES = [
     "REFUND",
     "TIMING",
 ]
-ALL_CLASSES = ["NORMAL"] + ISSUE_TYPES
+# A ground_truth_labels row can have true_issue_type=NULL for two different
+# reasons: the order is genuinely normal (is_anomaly=False), or it's one of
+# the hard tier's unmatched-bank-credit cases that the fixed six-category
+# taxonomy was never meant to cover (is_anomaly=True) — see
+# generate_synthetic_data.py's build_ambiguous_pair / build_unmatched_resolvable.
+# Naively filling NULL -> "NORMAL" would silently misclassify the second
+# group as the first. UNRESOLVED_UNLINKED is a reporting-only label (never
+# written to the database — true_issue_type's CHECK constraint doesn't
+# allow it) that keeps the two apart.
+UNRESOLVED_CLASS = "UNRESOLVED_UNLINKED"
+ALL_CLASSES = ["NORMAL"] + ISSUE_TYPES + [UNRESOLVED_CLASS]
 
 
 def load_data(conn) -> pd.DataFrame:
@@ -83,8 +97,21 @@ def load_data(conn) -> pd.DataFrame:
             "run `npm run reconcile` (apps/web) before evaluating."
         )
 
-    df["true_class"] = df["true_issue_type"].fillna("NORMAL")
-    df["predicted_class"] = df["issue_type"].fillna("NORMAL")
+    def true_class(row) -> str:
+        if not row["is_anomaly"]:
+            return "NORMAL"
+        # bool(nan) is True in Python — `if row[...]` would silently treat a
+        # NULL true_issue_type as truthy and return the NaN itself instead
+        # of falling through, so this must be an explicit null check.
+        return UNRESOLVED_CLASS if pd.isna(row["true_issue_type"]) else row["true_issue_type"]
+
+    def predicted_class(row) -> str:
+        if row["status"] == "RECONCILED":
+            return "NORMAL"
+        return UNRESOLVED_CLASS if pd.isna(row["issue_type"]) else row["issue_type"]
+
+    df["true_class"] = df.apply(true_class, axis=1)
+    df["predicted_class"] = df.apply(predicted_class, axis=1)
     df["predicted_anomaly"] = df["status"] != "RECONCILED"
     return df
 
@@ -154,7 +181,7 @@ def print_report(split: str, df: pd.DataFrame) -> None:
     print(f"  Recall:    {b['recall']:.4f}")
     print(f"  F1:        {b['f1']:.4f}")
 
-    print("\n-- Per-class classification (7-way: NORMAL + six issue types) --")
+    print("\n-- Per-class classification (8-way: NORMAL + six issue types + UNRESOLVED_UNLINKED) --")
     per_class = per_class_metrics(df)
     with pd.option_context("display.float_format", "{:.4f}".format):
         print(per_class.to_string(index=False))
@@ -184,10 +211,10 @@ def main() -> None:
     dev = df[df["split"] == "dev"]
     test = df[df["split"] == "test"]
 
-    print_report("dev (800)", dev)
+    print_report("dev", dev)
     # Held-out test — reported as-is, run once, not used to tune anything above.
-    print_report("test (200) — HELD-OUT, reported as-is", test)
-    print_report("overall (dev + test, 1000)", df)
+    print_report("test — HELD-OUT, reported as-is", test)
+    print_report("overall (dev + test)", df)
 
 
 if __name__ == "__main__":

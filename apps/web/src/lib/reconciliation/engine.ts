@@ -29,16 +29,13 @@ import {
   RAZORPAY_FEE_RATE,
   TIMING_TOLERANCE_DAYS,
 } from "./constants";
+import { daysBetween } from "./dateUtils";
+import { fuzzyMatchSettlement } from "./fuzzyMatch";
 import type { EngineVerdict, OrderReconciliationInput } from "./types";
 
 /** gross - fee - tax - refund, using the payment's own recorded figures. */
 function expectedNetFromPayment(payment: Payment): number {
   return payment.amount_paise - payment.fee_paise - payment.tax_paise - payment.refund_amount_paise;
-}
-
-function daysBetween(a: string, b: string): number {
-  const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / msPerDay);
 }
 
 /**
@@ -96,6 +93,39 @@ function missingSettlementVerdict(order: Order, payment: Payment, settlement?: S
       : `Payment ${payment.payment_ref} was captured but no settlement has been created yet.`,
     payment_id: payment.id,
     settlement_id: settlement?.id ?? null,
+    bank_transaction_id: null,
+  };
+}
+
+/**
+ * Fuzzy pass found candidates but none confident enough to auto-match
+ * (either below the absolute threshold, or tied closely enough with the
+ * runner-up that picking one would be a guess). Routed to REVIEW_NEEDED
+ * rather than classified as any of the six issue types — a human needs to
+ * pick the right settlement, the engine isn't claiming to know which one.
+ */
+function unresolvedFuzzyVerdict(
+  order: Order,
+  payment: Payment,
+  settlement: Settlement,
+  bestScore: number,
+  secondBestScore: number | null,
+): EngineVerdict {
+  const reason =
+    secondBestScore !== null
+      ? `Best candidate bank credit for settlement ${settlement.settlement_ref} scores ${(bestScore * 100).toFixed(0)}% confidence, only ${((bestScore - secondBestScore) * 100).toFixed(0)} points ahead of the next candidate — too ambiguous to auto-match.`
+      : `Best candidate bank credit for settlement ${settlement.settlement_ref} scores only ${(bestScore * 100).toFixed(0)}% confidence — below the auto-match threshold, declining to guess.`;
+  return {
+    order_id: order.id,
+    status: "REVIEW_NEEDED",
+    issue_type: null,
+    expected_amount_paise: settlement.net_amount_paise,
+    actual_amount_paise: null,
+    confidence_score: Math.round(bestScore * 100),
+    recommendation: "REVIEW",
+    reason,
+    payment_id: payment.id,
+    settlement_id: settlement.id,
     bank_transaction_id: null,
   };
 }
@@ -222,9 +252,9 @@ function toleranceChecks(
   };
 }
 
-/** Runs all three passes for a single order. Never touches ground_truth_labels. */
+/** Runs all passes for a single order. Never touches ground_truth_labels. */
 export function reconcileOrder(input: OrderReconciliationInput): EngineVerdict {
-  const { order, payments, settlements, bankTransactions } = input;
+  const { order, payments, settlements, bankTransactions, orphanBankTransactions } = input;
 
   // Pass 1: exact match — locate this order's payment by foreign key.
   const payment = payments.find((p) => p.order_id === order.id);
@@ -238,7 +268,28 @@ export function reconcileOrder(input: OrderReconciliationInput): EngineVerdict {
   // Pass 2: aggregation match — every bank transaction linked to this settlement.
   const linkedBankTxns = bankTransactions.filter((b) => b.matched_settlement_id === settlement.id);
   const [onlyBankTxn] = linkedBankTxns;
-  if (!onlyBankTxn) return missingSettlementVerdict(order, payment, settlement);
+
+  if (!onlyBankTxn) {
+    // Pass 2.5: fuzzy candidate match — the clean FK link is missing, so
+    // search every orphan bank credit in the dataset for the best
+    // amount+date(+reference) match before giving up on this settlement.
+    const fuzzy = fuzzyMatchSettlement(order, settlement, orphanBankTransactions);
+    if (fuzzy.kind === "no_candidates") return missingSettlementVerdict(order, payment, settlement);
+    if (fuzzy.kind === "ambiguous") {
+      return unresolvedFuzzyVerdict(order, payment, settlement, fuzzy.bestScore, fuzzy.secondBestScore);
+    }
+    // Resolved — run the same Pass 3 tolerance checks as a clean FK match
+    // would, then cap the resulting confidence by how sure the fuzzy match
+    // itself was (a fuzzy-resolved RECONCILED is never as certain as an
+    // exact-match one), and note the fuzzy resolution in the reason text.
+    const verdict = toleranceChecks(order, payment, settlement, fuzzy.bankTxn);
+    return {
+      ...verdict,
+      confidence_score:
+        verdict.confidence_score === null ? null : Math.round(Math.min(verdict.confidence_score, fuzzy.score * 100)),
+      reason: `[Fuzzy-matched at ${(fuzzy.score * 100).toFixed(0)}% confidence — no clean bank reference] ${verdict.reason}`,
+    };
+  }
   if (linkedBankTxns.length > 1) return duplicateVerdict(order, payment, settlement, linkedBankTxns);
 
   // Pass 3: tolerant match against the single confirmed bank credit.

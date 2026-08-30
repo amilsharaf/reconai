@@ -88,6 +88,10 @@ async function main() {
     if (!bankTxnsBySettlement.has(b.matched_settlement_id)) bankTxnsBySettlement.set(b.matched_settlement_id, []);
     bankTxnsBySettlement.get(b.matched_settlement_id)!.push(b);
   }
+  // Global pool for the fuzzy-matching pass: every bank credit with no
+  // matched_settlement_id at all, anywhere in the dataset.
+  const orphanBankTransactions = bankTransactions.filter((b) => !b.matched_settlement_id);
+  console.log(`  orphan bank transactions (no matched_settlement_id): ${orphanBankTransactions.length}`);
 
   console.log(`Running reconciliation engine over ${orders.length} orders ...`);
   const statusCounts: Record<string, number> = {};
@@ -104,6 +108,7 @@ async function main() {
       payments: orderPayments,
       settlements: relevantSettlements,
       bankTransactions: relevantBankTxns,
+      orphanBankTransactions,
     });
 
     statusCounts[verdict.status] = (statusCounts[verdict.status] ?? 0) + 1;
