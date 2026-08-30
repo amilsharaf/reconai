@@ -14,7 +14,10 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "generate:data": "python scripts/generate_synthetic_data.py",
-    "load:data": "python scripts/load_synthetic_data.py"
+    "load:data": "python scripts/load_synthetic_data.py",
+    "migrate:db": "python scripts/apply_migrations.py",
+    "reconcile": "npm run reconcile --workspace=@reconai/web",
+    "evaluate": "python scripts/evaluate.py"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

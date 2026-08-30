@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "reconcile": "tsx scripts/run-reconciliation.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -20,6 +21,8 @@
     "@types/node": "^22.13.4",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "dotenv": "^16.4.5",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
 }
