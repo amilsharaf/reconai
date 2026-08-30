@@ -26,7 +26,7 @@ WinsFresh's multi-week multi-team schedule — see `PROJECT_SUMMARY.md` §7.
 | 2 — Reconciliation Engine | Aug 30 | ✅ Complete |
 | 3 — Evaluation Framework | Aug 31 | ✅ Complete |
 | 4 — AI Layer | Sep 1 | 🟡 Built + verified, partial run (rate-limit-bound) |
-| 5 — Dashboard | Sep 2 | ⏳ Planned |
+| 5 — Dashboard | Sep 2 | ✅ Complete |
 | 6 — Copilot + Polish | Sep 3 | ⏳ Planned (Copilot is stretch) |
 | 7 — Submission Prep | Sep 4 | ⏳ Planned |
 | 8 — Submit | Sep 5 | ⏳ Planned |
@@ -282,8 +282,7 @@ operator can act on — without letting the model touch the arithmetic.
 
 # PHASE 5 — Dashboard
 
-**Day:** Sep 2 · **Priority:** High · **Status:** ⏳ Planned (trim first if
-behind schedule)
+**Day:** Sep 2 · **Priority:** High · **Status:** ✅ Complete
 
 ## Purpose
 
@@ -291,17 +290,30 @@ Make the engine's output legible.
 
 ## Deliverables
 
-- Overview: KPIs (match rate, value reconciled, value at risk) + status
-  chart.
-- Exceptions table: issue, amount, confidence, priority, filters.
-- Transaction investigation page: timeline + evidence + AI explanation.
-- *Stretch:* separate audit-log page (fold into investigation page if short
-  on time).
+- [x] Overview: KPIs (match rate, value reconciled, value at risk) + status
+      chart — `apps/web/src/app/page.tsx`, real Supabase queries
+      (`lib/dashboard/queries.ts`), no mock data.
+- [x] Exceptions table: issue, amount, confidence, priority, filters —
+      `components/ExceptionsTable.tsx`, filterable by issue type/status,
+      sortable by amount/confidence.
+- [x] Transaction investigation page: timeline + evidence + AI explanation —
+      `app/transactions/[id]/page.tsx`.
+- [x] Audit-log page folded into investigation (per the scope decision, not
+      built separately) — `components/investigation/AuditTrail.tsx`, every
+      `audit_logs` row for that specific `reconciliation_result_id`.
 
 ## Definition of Done
 
 A finance operator can go from "match rate dropped" to "here's the specific
-order, here's why, here's what to do" without touching SQL.
+order, here's why, here's what to do" without touching SQL — verified by
+walking through five representative cases (a clean `RECONCILED` row, an
+`EXCEPTION`/`DUPLICATE` with two bank credits, the fuzzy-match `REVIEW_NEEDED`/
+ambiguous case, a `MISSING_SETTLEMENT` case, and a `FAILED` AI-explanation
+case) end to end in a real browser, and by cross-checking every KPI number
+against an independent live SQL query (not the UI's own numbers) — all
+matched exactly. See `STATUS_REPORT.md` for the two real bugs found and
+fixed while doing that (a silent 1000-row query cap, and an unbounded
+13,198px-tall table).
 
 ---
 
