@@ -104,7 +104,7 @@ def load_bank_transactions(cur) -> int:
 
 def load_ground_truth_labels(cur) -> int:
     rows = read_csv("ground_truth_labels")
-    columns = ["order_id", "is_anomaly", "true_issue_type", "split"]
+    columns = ["order_id", "is_anomaly", "true_issue_type", "split", "notes"]
     bulk_insert(cur, "ground_truth_labels", rows, columns)
     return len(rows)
 
