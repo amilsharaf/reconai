@@ -8,11 +8,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "reconcile": "tsx scripts/run-reconciliation.ts"
+    "reconcile": "tsx scripts/run-reconciliation.ts",
+    "explain": "tsx scripts/run-ai-explanations.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "@anthropic-ai/sdk": "^0.30.0",
+    "@anthropic-ai/sdk": "^0.122.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
