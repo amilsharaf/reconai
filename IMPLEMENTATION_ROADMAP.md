@@ -25,7 +25,7 @@ WinsFresh's multi-week multi-team schedule — see `PROJECT_SUMMARY.md` §7.
 | 1 — Data & Database Foundation | Aug 29 | ✅ Complete |
 | 2 — Reconciliation Engine | Aug 30 | ✅ Complete |
 | 3 — Evaluation Framework | Aug 31 | ✅ Complete |
-| 4 — AI Layer | Sep 1 | ⏳ Planned |
+| 4 — AI Layer | Sep 1 | 🟡 Built + verified, partial run (rate-limit-bound) |
 | 5 — Dashboard | Sep 2 | ⏳ Planned |
 | 6 — Copilot + Polish | Sep 3 | ⏳ Planned (Copilot is stretch) |
 | 7 — Submission Prep | Sep 4 | ⏳ Planned |
@@ -236,7 +236,7 @@ positives. Full breakdown, reasoning, and real command output in
 
 # PHASE 4 — AI Layer
 
-**Day:** Sep 1 · **Priority:** High · **Status:** ⏳ Planned
+**Day:** Sep 1 · **Priority:** High · **Status:** 🟡 Built and verified working, not yet run to completion (rate-limit-bound, not code-bound)
 
 ## Purpose
 
@@ -249,20 +249,34 @@ operator can act on — without letting the model touch the arithmetic.
 
 ## Deliverables
 
-- Exception classifier maps engine output to one of the six categories
-  (already computed deterministically — the AI layer explains the existing
-  classification, it does not re-derive it).
-- Claude API call receives structured evidence (amounts, dates, references)
-  and returns an explanation string — never a number that changes the
-  reconciliation status.
-- Recommendation output surfaced: `AUTO_RECONCILE` / `REVIEW` /
-  `INVESTIGATE`.
+- [x] Exception classifier maps engine output to one of the six categories
+      — unchanged from Phase 2; the AI layer explains the existing
+      classification, it does not re-derive it.
+- [x] AI call (`apps/web/src/lib/ai/`) receives structured evidence
+      (amounts, confidence, recommendation, the engine's own deterministic
+      `reason` — which for fuzzy-match cases already carries the candidate-
+      scoring breakdown) and returns an explanation string only — never a
+      number that changes the reconciliation status. Provider is Gemini,
+      not Claude — see `PROJECT_SUMMARY.md` §4's revision note for why.
+- [x] Recommendation output surfaced: `AUTO_RECONCILE` / `REVIEW` /
+      `INVESTIGATE` — unchanged from Phase 2, just referenced in the
+      explanation text now.
 
 ## Definition of Done
 
-Every `EXCEPTION` or `REVIEW_NEEDED` row has an AI-generated explanation
-string, and swapping the explanation model would never change a single
-reconciliation number.
+- [ ] Every `EXCEPTION` or `REVIEW_NEEDED` row has an AI-generated
+      explanation string — **not yet true for all 286 candidate rows.**
+      As of 2026-08-30, 96 are `COMPLETED` (real, verified, grounded-only-
+      in-evidence explanations — one per issue type plus the ambiguous-
+      unlinked case are shown in `STATUS_REPORT.md`), the rest are
+      `PENDING`/`FAILED` because the free-tier Gemini key's daily/rate
+      quota was exhausted mid-run, not because anything is broken.
+      Finishing is `npm run explain` again once more quota is available
+      (safe to re-run — only `PENDING` rows are picked up).
+- [x] Swapping the explanation model never changes a single reconciliation
+      number — verified structurally: the AI call only ever writes
+      `ai_explanation`/`ai_explanation_status` via `set_ai_explanation_atomic`,
+      which has no path to touch `status`/`issue_type`/amounts/`confidence_score`.
 
 ---
 

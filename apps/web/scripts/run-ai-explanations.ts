@@ -13,11 +13,15 @@
  *
  * Re-running is safe: only PENDING rows are picked up, so a completed or
  * explicitly-failed row is never silently overwritten by accident. Pass
- * --retry-failed to also re-attempt rows currently marked FAILED.
+ * --retry-failed to also re-attempt rows currently marked FAILED, or
+ * --ids=<uuid,uuid,...> to target specific reconciliation_results rows
+ * (e.g. backfilling a representative sample under a tight rate-limit quota
+ * instead of a full concurrent sweep).
  *
  * Usage (from apps/web):
  *   npm run explain
  *   npm run explain -- --retry-failed
+ *   npm run explain -- --ids=<uuid>,<uuid>
  */
 
 import { config } from "dotenv";
@@ -32,7 +36,7 @@ import { explainException } from "../src/lib/ai/explainException";
 import type { ExceptionEvidence } from "../src/lib/ai/types";
 import type { IssueType, Recommendation, ReconciliationStatus } from "../src/types/reconciliation";
 
-const CONCURRENCY = 5;
+const CONCURRENCY = 2; // free-tier Gemini key — low RPM quota; explainException.ts retries 429s with backoff too
 
 interface CandidateRow {
   id: string;
@@ -83,18 +87,26 @@ async function runWithConcurrency<T>(items: T[], limit: number, fn: (item: T) =>
 
 async function main() {
   const retryFailed = process.argv.includes("--retry-failed");
+  const idsArg = process.argv.find((a) => a.startsWith("--ids="));
+  const targetIds = idsArg ? idsArg.slice("--ids=".length).split(",").filter(Boolean) : null;
   const supabase = createServiceClient();
 
   const statuses = retryFailed ? ["PENDING", "FAILED"] : ["PENDING"];
-  console.log(`Fetching EXCEPTION/REVIEW_NEEDED rows with ai_explanation_status IN (${statuses.join(", ")}) ...`);
+  console.log(
+    targetIds
+      ? `Fetching ${targetIds.length} specific reconciliation_results row(s) ...`
+      : `Fetching EXCEPTION/REVIEW_NEEDED rows with ai_explanation_status IN (${statuses.join(", ")}) ...`,
+  );
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("reconciliation_results")
     .select(
       "id, order_id, status, issue_type, expected_amount_paise, actual_amount_paise, confidence_score, recommendation, reason, orders(order_number)",
     )
-    .in("status", ["EXCEPTION", "REVIEW_NEEDED"])
-    .in("ai_explanation_status", statuses);
+    .in("status", ["EXCEPTION", "REVIEW_NEEDED"]);
+  query = targetIds ? query.in("id", targetIds) : query.in("ai_explanation_status", statuses);
+
+  const { data, error } = await query;
 
   if (error) throw new Error(`Fetching candidate rows failed: ${error.message}`);
   const rows = (data ?? []) as unknown as CandidateRow[];
@@ -103,7 +115,8 @@ async function main() {
   let completed = 0;
   let failed = 0;
 
-  await runWithConcurrency(rows, CONCURRENCY, async (row) => {
+  const concurrency = targetIds ? 1 : CONCURRENCY; // targeted/small runs go fully sequential
+  await runWithConcurrency(rows, concurrency, async (row) => {
     const evidence = toEvidence(row);
     const result = await explainException(evidence);
 

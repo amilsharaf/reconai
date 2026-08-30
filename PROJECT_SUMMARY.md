@@ -80,7 +80,7 @@ engine ever having seen the labels it's scored against.
 | **Database** | PostgreSQL via Supabase | Locked |
 | **Auth / RLS** | Supabase Auth + Postgres Row Level Security | Locked |
 | **Data Generator** | Python (pandas) — one-off script, outputs CSV, never touches the live app stack | Locked |
-| **AI Layer** | Claude API — explanation and classification only, never arithmetic | Locked |
+| **AI Layer** | ~~Claude API~~ **Revised 2026-08-30: Gemini API** (`gemini-3.5-flash-lite`) — explanation and classification only, never arithmetic; the "never arithmetic" constraint is unchanged, only the provider moved | Revised — see note below |
 | **Deployment** | Vercel (app) + Supabase (database) — single target | Locked |
 | **Synthetic Dataset** | 1,000 records, 800 dev / 200 held-out test, hidden ground truth | Locked — do not shrink to save time |
 | **Testing** | Evaluation-set metrics (precision/recall/F1) are the primary confidence signal, not unit test coverage | Locked |
@@ -89,6 +89,17 @@ engine ever having seen the labels it's scored against.
 These decisions are locked unless a real requirement forces a revision — if
 that happens, record the change and the reason in this document's history
 rather than silently drifting.
+
+**Revision, 2026-08-30 — AI Layer provider.** Built against Claude first
+(`claude-opus-5`, code still in git history / `.env`'s unused
+`ANTHROPIC_API_KEY`). Switched to Gemini (`gemini-3.5-flash-lite`) because
+the Anthropic account in use has no billing configured and credits could
+not be purchased at the time, while a free Gemini API key was available.
+The locked constraint this row exists to enforce — explanation and
+classification only, the model never performs the reconciliation math —
+is unaffected; only the vendor changed. Reverting is a matter of restoring
+`apps/web/src/lib/ai/explainException.ts`'s prior version once billing is
+sorted. See `STATUS_REPORT.md` for the real run this produced.
 
 ---
 
