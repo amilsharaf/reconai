@@ -2,6 +2,7 @@ import { getExceptionRows, getKpis } from "@/lib/dashboard/queries";
 import { KpiRow } from "@/components/KpiRow";
 import { StatusBreakdownChart } from "@/components/StatusBreakdownChart";
 import { ExceptionsTable } from "@/components/ExceptionsTable";
+import { CopilotLauncher } from "@/components/copilot/CopilotLauncher";
 
 export const dynamic = "force-dynamic"; // always read live data, never cache a stale snapshot
 
@@ -10,13 +11,16 @@ export default async function OverviewPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-8">
-      <header className="mb-6">
-        <h1 className="text-xl font-semibold" style={{ color: "var(--ink-primary)" }}>
-          ReconAI
-        </h1>
-        <p className="text-sm" style={{ color: "var(--ink-secondary)" }}>
-          Multi-source payment reconciliation — overview &amp; exceptions
-        </p>
+      <header className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold" style={{ color: "var(--ink-primary)" }}>
+            ReconAI
+          </h1>
+          <p className="text-sm" style={{ color: "var(--ink-secondary)" }}>
+            Multi-source payment reconciliation — overview &amp; exceptions
+          </p>
+        </div>
+        <CopilotLauncher />
       </header>
 
       <section className="mb-6">
