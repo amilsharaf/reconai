@@ -27,7 +27,7 @@ WinsFresh's multi-week multi-team schedule — see `PROJECT_SUMMARY.md` §7.
 | 3 — Evaluation Framework | Aug 31 | ✅ Complete |
 | 4 — AI Layer | Sep 1 | 🟡 Built + verified, partial run (rate-limit-bound) |
 | 5 — Dashboard | Sep 2 | ✅ Complete |
-| 6 — Copilot + Polish | Sep 3 | ⏳ Planned (Copilot is stretch) |
+| 6 — Copilot + Polish | Sep 3 | 🟡 Copilot done, dashboard polish not done |
 | 7 — Submission Prep | Sep 4 | ⏳ Planned |
 | 8 — Submit | Sep 5 | ⏳ Planned |
 
@@ -319,8 +319,9 @@ fixed while doing that (a silent 1000-row query cap, and an unbounded
 
 # PHASE 6 — Copilot + Polish
 
-**Day:** Sep 3 · **Priority:** Medium (stretch-heavy) · **Status:** ⏳
-Planned
+**Day:** Sep 3 · **Priority:** Medium (stretch-heavy) · **Status:** 🟡
+Copilot built and verified; dashboard polish (loading/error/empty states)
+not done
 
 ## Purpose
 
@@ -329,16 +330,26 @@ only if every prior phase is done.
 
 ## Deliverables
 
-- *Stretch:* Finance Copilot — question → tool call → SQL → verified result
-  → explanation.
-- Loading / error / empty states across the dashboard.
-- Desktop polish (mobile responsiveness is explicitly not a priority for
-  this track).
+- [x] Finance Copilot — question → tool call → real Supabase query →
+      verified result → grounded answer. Note: "tool call → SQL" in the
+      original wording — the LLM never writes SQL itself, the five fixed
+      tool functions do (`apps/web/src/lib/copilot/tools.ts`), which is
+      the stricter and correct reading of "never the model guessing." Not
+      a stretch — every prior phase was done first, per the prerequisite.
+- [ ] Loading / error / empty states across the dashboard — not done this
+      pass; the Copilot panel has its own loading/error states, the rest
+      of the dashboard (Phase 5) doesn't yet.
+- [ ] Desktop polish — not revisited this pass.
 
 ## Definition of Done
 
-Every prior phase's Definition of Done still holds; Copilot ships only if it
-doesn't put those at risk.
+Every prior phase's Definition of Done still holds — verified: no other
+phase's write paths were touched. Copilot's own Definition of Done: every
+number in a Copilot answer traces back to a real tool call, verified
+directly (five in-scope questions + one out-of-scope, all tested for real
+against the live API and the live browser UI, audit_logs confirmed for
+both a grounded answer and a declined question — see `STATUS_REPORT.md`).
+Dashboard polish remains open — Phase 6 is not fully complete.
 
 ---
 
